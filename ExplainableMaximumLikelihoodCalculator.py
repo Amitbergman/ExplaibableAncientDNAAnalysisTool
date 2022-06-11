@@ -600,70 +600,9 @@ class ExplainableMaximumLikelihoodCalculator:
         values = [i[1] for i in t]
         names = ["read " + str(i[0]) for i in t]
         shap.force_plot(self.explainer.expected_value[0], np.asarray(values), feature_names=names, matplotlib=True)
-    
-    def analyze_read_index(self, read_index):
-        read_to_analyze = self.list_of_reads[read_index]
-        read_length = len(read_to_analyze)
-        print(read_to_analyze, read_length)
-        data = []
-
-        references_denisovans = []
-        references_neanderthals = []
-        references_sapienses = []
-
-        number_of_neanderthal_refs = len(self.second_species_reference_ids)
-        number_of_sapiens_refs = len(self.first_species_reference_ids)
-        number_of_denisovan_refs = len(self.third_species_reference_ids)
-
-        for alignment_index in range(len(self.alignments_denisovans[read_index])):
-            start = self.alignments_denisovans[read_index][alignment_index][3]
-            end = self.alignments_denisovans[read_index][alignment_index][4]
-            reference = self.alignments_denisovans[read_index][alignment_index][0][start:end]
-            references_denisovans.append(reference)
-
-        for alignment_index in range(len(self.alignments_neanderthals[read_index])):
-            start = self.alignments_neanderthals[read_index][alignment_index][3]
-            end = self.alignments_neanderthals[read_index][alignment_index][4]
-            reference = self.alignments_neanderthals[read_index][alignment_index][0][start:end]
-            references_neanderthals.append(reference)
-
-        for alignment_index in range(len(self.alignments_sapienses[read_index])):
-            start = self.alignments_sapienses[read_index][alignment_index][3]
-            end = self.alignments_sapienses[read_index][alignment_index][4]
-            reference = self.alignments_sapienses[read_index][alignment_index][0][start:end]
-            references_sapienses.append(reference)
 
 
-        for i in range(read_length):
-
-            neanderthal_in_index = [ref_neanderthal[i] for ref_neanderthal in references_neanderthals]
-            denisovans_in_index = [ref_denisovan[i] for ref_denisovan in references_denisovans]
-            sapiens_in_index = [ref_sapien[i] for ref_sapien in references_sapienses]
-
-            hit_percentage_neanderthals = len([l for l in neanderthal_in_index if l == read_to_analyze[i]])/number_of_neanderthal_refs
-            hit_percentage_denisovans = len([l for l in denisovans_in_index if l == read_to_analyze[i]])/number_of_denisovan_refs
-            hit_percentage_sapienses = len([l for l in sapiens_in_index if l == read_to_analyze[i]])/number_of_sapiens_refs
-            most_frequent_denisovans = self.get_most_frequent_in_list(denisovans_in_index)
-            most_frequent_neanderthal = self.get_most_frequent_in_list(neanderthal_in_index)        
-            most_frequent_sapiens = self.get_most_frequent_in_list(sapiens_in_index)
-            data.append((i, read_to_analyze[i], hit_percentage_neanderthals, hit_percentage_sapienses, hit_percentage_denisovans, most_frequent_neanderthal, most_frequent_sapiens, most_frequent_denisovans))
-
-        filtered = [a for a in data if a[2]!=a[3] or a[3]!=a[4]]
-        return filtered
-    
-    def get_most_frequent_in_list(self, l):
-        counter = 0
-        num = l[0]
-        
-        for i in l:
-            curr_frequency = l.count(i)
-            if(curr_frequency> counter):
-                counter = curr_frequency
-                num = i
-    
-        return num
-
-    def influenceOfReferenceNeanderthal(self, reference_index_to_remove, result_resolution=40):
+    def influenceOfReference(self, reference_index_to_remove, result_resolution=40):
         modified_probabilities_without_reference_i = np.zeros((self.number_of_reads, 3))
         modified_probabilities_without_reference_i[:,0] = self.probabilities_sapiens
         modified_probabilities_without_reference_i[:,2] = self.probabilities_denisovans
