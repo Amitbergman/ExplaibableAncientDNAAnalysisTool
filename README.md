@@ -20,7 +20,7 @@ Requirements for running the GUI and the system on your linux machine (you can u
 
 ### Run the project
 
-1. Clone this repo.
+1. Clone this repo ``git clone https://github.com/Amitbergman/ExplaibableAncientDNAAnalysisTool.git``
 2. Run ``Jupyter lab``
 3. Run the ``Demo`` notebook for a step by step demo.
 4. Run the ``GUI`` notebook for the GUI that interacts with the system. 
