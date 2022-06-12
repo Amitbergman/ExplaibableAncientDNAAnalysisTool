@@ -219,9 +219,9 @@ class ExplainableMaximumLikelihoodCalculator:
     #First param is the alpha of the sapiens, second is the alpha of the neanderthal, third is a denisovan
     def calc_likelihood(self, alphas_vector, ignore_read_indexes=[]) -> float:
        
-        if (sum(alphas_vector)!=1):
+        if (sum(alphas_vector)>1.00001 or sum(alphas_vector) < 0.9999):
             raise Exception(f"Sum of alphas must be 1. Got the sum: {sum(alphas_vector)}")
-        if (min(alphas_vector) < 0):
+        if (min(alphas_vector) < -0.000001):
             raise Exception(f"Alpha must be positive value. You entered a value of {min(alphas_vector)}")
         likelihood_of_data = 1.0
         indexes_to_cover = [i for i in range(self.number_of_reads) if i not in ignore_read_indexes and i not in self.exclude_indexes]
@@ -671,3 +671,45 @@ class ExplainableMaximumLikelihoodCalculator:
             return (current_reads_to_ignore, max_after)
         else:
             return []
+
+    
+    #Optimize the likelihood function usinge a variant of the gradient descent algorithm
+    def estimate_species_proportions_gradient_descent(self, number_of_starting_points = 1, number_of_iterations=100, ignore_list_indexes=[]):
+        assert(len(ignore_list_indexes) < len(self.list_of_reads))
+        array = np.zeros((1,3))
+        features = ["Homo Sapiens", "Neanderthals", "Denisovans"]
+        rows = ["Estimation"]
+        current_all = np.asarray([0.3,0.3,0.4])
+        baseline = self.calc_likelihood(current_all, ignore_list_indexes)
+        best_value_all = baseline
+        for i in range(number_of_starting_points):
+            a = random.randint(0,10)
+            b = random.randint(0,10-a)
+            c = 10-a-b
+            starting_point = np.asarray([a/10,b/10,c/10])
+            current = starting_point
+            change_rate = 0.01
+            for i in range(number_of_iterations):
+                option_a = self.__makeSumOneAndVerifyNoNegative__(current + [change_rate, -change_rate, 0])
+                option_b = self.__makeSumOneAndVerifyNoNegative__(current + [-change_rate, change_rate, 0])
+                option_c = self.__makeSumOneAndVerifyNoNegative__(current + [change_rate,0, -change_rate])
+                option_d = self.__makeSumOneAndVerifyNoNegative__(current + [-change_rate,0, change_rate])
+                option_e = self.__makeSumOneAndVerifyNoNegative__(current + [0,change_rate, -change_rate])
+                option_f = self.__makeSumOneAndVerifyNoNegative__(current + [0, -change_rate, change_rate])
+                options = [option_a, option_b, option_c, option_d, option_e, option_f, current]
+                options_with_results = [(a,self.calc_likelihood(a, ignore_list_indexes)) for a in options]
+                best = max(range(len(options_with_results)), key=lambda ind: options_with_results[ind][1])
+                current = options[best]
+                best_value_current = options_with_results[best][1]
+            if (best_value_current > best_value_all):
+                best_value_all = best_value_current
+                current_all = current
+        array[0][0] = current_all[0]
+        array[0][1] = current_all[1]
+        array[0][2] = current_all[2]
+        return pd.DataFrame(array, index=rows, columns=features)
+    
+    def __makeSumOneAndVerifyNoNegative__(self, vector):
+        if min(vector) < 0:
+            return np.asarray([1,0,0])
+        return np.asarray([vector[0], vector[1], 1-(vector[0]+ vector[1])])
