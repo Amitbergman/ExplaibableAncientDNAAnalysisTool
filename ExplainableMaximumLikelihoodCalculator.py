@@ -20,7 +20,10 @@ gap_extend_score = -1
 class ExplainableMaximumLikelihoodCalculator:
     #Constructor is getting:
     #list_of_reads = input dataset to analyze
-    #ref_neanderthal = file names in which the references of neanderthals are
+    #paths to reference file names
+    #path to the substitution matrix to infer likelihoods
+    #number_of_jobs = number of threads that will work parallely
+    #species - names of species of which we estimate their proportions
     def __init__(self, list_of_reads, ref_neanderthal_file_names, ref_sapien_file_names, ref_denisovan_file_names, path_to_substitution_matrix, number_of_jobs, species=["Homo Sapiens", "Neanderthal", "Denisovan"]) -> None:
         assert(type(list_of_reads) == list and type(list_of_reads[0]) == str)
         assert(type(ref_sapien_file_names) == list and type(ref_sapien_file_names[0]) == str)
