@@ -1,6 +1,6 @@
-﻿# exML - explainable ancient DNA analysis tool
+﻿# exML - explainable DNA analysis tool
 
-This project includes a python system to classify a dataset of DNA read (either ``.bam`` or ``.fasta`` files) and output the estimated proportion of different species in the dataset.
+This project includes a python system to classify a dataset of DNA reads (either ``.bam`` or ``.fasta`` files) and output the estimated proportion of different species in the dataset.
 It also provides explanations to the output that make it more interpretale and resolve ambiguities in the output.
 
 ## Getting Started
@@ -17,6 +17,7 @@ Requirements for running the GUI and the system on your **linux machine** (you c
 - [pysam](https://pysam.readthedocs.io/en/latest/api.html)
 - [joblib](https://joblib.readthedocs.io/en/latest/)
 - [bioconda](https://bioconda.github.io/)
+- [termcolor](https://anaconda.org/conda-forge/termcolor)
 
 ### Run the project
 
