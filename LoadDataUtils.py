@@ -10,10 +10,12 @@ sapienses = ["AY195749.2","AY195757.1", "AY195781.2","AF346981.1",  "AY195760.2"
 def getListOfReadsFromBamFile(bamFilePath):
     samfile = pysam.AlignmentFile(bamFilePath, "rb")
     list_to_return = []
-    for entry in samfile:
+    for (ind, entry) in enumerate(samfile):
         list_to_return.append({
             "read": str(entry.seq),
-            "isReverse": entry.is_reverse
+            "isReverse": entry.is_reverse,
+            "rg":[a[1] for a in entry.get_tags() if a[0] == "RG"][0],
+            "index": ind
         })
     return list_to_return
 

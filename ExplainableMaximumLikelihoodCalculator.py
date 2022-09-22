@@ -348,56 +348,6 @@ class ExplainableMaximumLikelihoodCalculator:
         result[0][2] = max_alphas[2]
         return result
 
-
-    def explain_the_results(self):
-
-        number_of_samples = self.number_of_reads
-        probabilities = [(self.probabilities_sapiens[i], self.probabilities_neanderthals[i], self.probabilities_denisovans[i]) for i in range(self.number_of_reads)]
-        samples_that_the_sapien_wins = [(probabilities[i], i) for i in range(number_of_samples) if probabilities[i][0] > probabilities[i][1]*1.01 and probabilities[i][0] > probabilities[i][2]*1.01]
-        print("sapien    neanderthel      denisovan     Read number")
-        print("These are reads that are probably Sapien:\n")
-        print("\n".join(repr(x) for x in samples_that_the_sapien_wins))
-
-        samples_that_the_neanderthal_wins = [(probabilities[i], i) for i in range(number_of_samples) if probabilities[i][1] > probabilities[i][0]*1.01 and probabilities[i][1] > probabilities[i][2]*1.01]
-        print("\n\nThese are reads that are probably Neanderthal:\n")
-        print("\n".join(repr(x) for x in samples_that_the_neanderthal_wins))
-
-        samples_that_the_denisovan_wins = [(probabilities[i], i) for i in range(number_of_samples) if probabilities[i][2] > probabilities[i][1]*1.01 and probabilities[i][2] > probabilities[i][0]*1.01]
-        print("\n\nThese are reads that are probably Denisovan:\n")
-        print("\n".join(repr(x) for x in samples_that_the_denisovan_wins))
-        print("------------------------------------------")
-        samples_that_the_sapien_loses = [(probabilities[i], i) for i in range(number_of_samples) if probabilities[i][0] < probabilities[i][1] and probabilities[i][0] < probabilities[i][2]]
-        samples_that_the_neanderthal_loses = [(probabilities[i], i) for i in range(number_of_samples) if probabilities[i][1] < probabilities[i][0] and probabilities[i][1] < probabilities[i][2]]
-        samples_that_the_denisovan_loses = [(probabilities[i], i) for i in range(number_of_samples) if probabilities[i][2] < probabilities[i][1] and probabilities[i][2] < probabilities[i][0]]
-
-        sapiens_wins_indexes = [i[1] for i in samples_that_the_sapien_wins]
-        neanderthal_wins_indexes = [i[1] for i in samples_that_the_neanderthal_wins]
-        denisovan_wins_indexes = [i[1] for i in samples_that_the_denisovan_wins]
-
-        sapiens_loses_indexes = [i[1] for i in samples_that_the_sapien_loses]
-        neanderthal_loses_indexes = [i[1] for i in samples_that_the_neanderthal_loses]
-        denisovan_loses_indexes = [i[1] for i in samples_that_the_denisovan_loses]
-        reads_with_winner = []
-        for i in range(len(self.list_of_reads)):
-            if (i in sapiens_wins_indexes):
-                reads_with_winner.append((i, self.list_of_reads[i], "Sapiens"))
-            elif (i in neanderthal_wins_indexes):
-                reads_with_winner.append((i, self.list_of_reads[i], "Neanderthal"))
-            elif (i in denisovan_wins_indexes):
-                reads_with_winner.append((i, self.list_of_reads[i], "Denisovan"))
-            elif (i in self.exclude_indexes):
-                reads_with_winner.append((i, self.list_of_reads[i], "Too small alignment score - excluded from analysis"))
-            else:
-                to_add = ""
-                if (i in sapiens_loses_indexes):
-                    to_add = " but probably not sapiens"
-                elif (i in neanderthal_loses_indexes):
-                    to_add = " but probably not neanderthal"
-                elif (i in denisovan_loses_indexes):
-                    to_add = " but probably not Denisovan"
-                reads_with_winner.append((i, self.list_of_reads[i], "Don't know" + to_add))
-        print("\n".join(repr(x) for x in reads_with_winner))
-
     def estimate_shapley_value_for_read(self, read_index, number_of_samples_per_read):
         print(colored(f"Start working on read number {read_index} in processId {os.getpid()}", "green"))
         possible_indexes = [i for i in range(self.number_of_reads) if i!= read_index]
@@ -419,16 +369,20 @@ class ExplainableMaximumLikelihoodCalculator:
         average_influence_not_scaled = np.mean(np.asarray(results_with_minus_without_not_scaled), axis=0)
         return (read_index, average_influence_scaled, average_influence_not_scaled)
 
-    def estimate_shapley_values(self, number_of_samples_per_read=200, number_of_jobs=-1):
+    def estimate_shapley_values(self, number_of_samples_per_read=200, number_of_jobs=-1, sample_to_run = []):
         #This will return for every species the influence of every read on the value of the model
         #For example, results[0][i] will be the influence of read i on "Sapiens" value of the result 
         #For example, results[1][i] will be the influence of read i on "Neanderthals" value of the result 
         #For example, results[2][i] will be the influence of read i on "Denisovans" value of the result 
         #Positive number in sapiens influece means that this read made the model lean more to the direction of saying "Sapiens" 
+        
+        if (len(sample_to_run)==0):
+            sample_to_run = [i for i in range(self.number_of_reads)]
+        number_of_reads = len(sample_to_run)
         results_scaled = np.zeros((self.number_of_reads, 3))
         results_not_scaled = np.zeros((self.number_of_reads, 3))
             
-        results_from_threads = Parallel(n_jobs=number_of_jobs, backend='multiprocessing')(delayed(self.estimate_shapley_value_for_read)(i, number_of_samples_per_read) for i in range(self.number_of_reads))
+        results_from_threads = Parallel(n_jobs=number_of_jobs, backend='multiprocessing')(delayed(self.estimate_shapley_value_for_read)(i, number_of_samples_per_read) for i in sample_to_run)
         for (read_index, average_influence_scaled, average_influence_not_scaled) in results_from_threads:
             results_scaled[read_index] = average_influence_scaled
             results_not_scaled[read_index] = average_influence_not_scaled
@@ -488,6 +442,13 @@ class ExplainableMaximumLikelihoodCalculator:
     def getReadToAlignmentScoreTable(self):
         data_frame = pd.DataFrame(self.read_to_alignment_score, columns=[self.first_species_reference_ids + self.second_species_reference_ids + self.third_species_reference_ids])
         data_frame.loc['mean'] = data_frame.mean()
+        return data_frame
+    
+    def getReadToAlignmentScoreMeanOfSubsetOfData(self, subset_to_include):
+
+        mean = self.read_to_alignment_score[subset_to_include].mean(axis=0).reshape(1,self.number_of_references)
+        data_frame = pd.DataFrame(mean, columns=[self.first_species_reference_ids + self.second_species_reference_ids + self.third_species_reference_ids])
+
         return data_frame
 
     def getMaximumLikelihoodOnSample(self, samples,  index, number_of_features):
@@ -578,6 +539,8 @@ class ExplainableMaximumLikelihoodCalculator:
 
     def analyze_diff_on_removing_reference(self, number_of_runs=20, size_of_sample = 10, result_resolution=50):
         indexes = [i for i in range(self.number_of_reads)]
+        if (size_of_sample >= self.number_of_reads):
+            size_of_sample = self.number_of_reads // 2
         data = []
         number_of_neanderthals = len(self.second_species_reference_ids)
         number_of_sapienses = len(self.first_species_reference_ids)
@@ -648,7 +611,7 @@ class ExplainableMaximumLikelihoodCalculator:
         #return the average influence of removing this reference        
         return np.mean(data, 0)
 
-    #Generate counter factual, given shapley influence values                
+    #Generate counter factual 1, given shapley influence values                
     def generateCounterFactualMinimalSetToRemoveAndChangeMax(self, influence_values):
         #current_maximizer = self.max_3_references()
         #calculate reads that are most influential against it
