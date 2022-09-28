@@ -469,7 +469,7 @@ class ExplainableMaximumLikelihoodCalculator:
     
     #This treats every read in the sample as a feature, and finds the shap values of them
     #Meaning what is the contribution of each of the reads to the final result
-    def calculate_shap_values(self, nsamples=10000):
+    def calculate_shapley_values(self, nsamples=10000):
         
         all_zeros_sample = np.zeros((1,self.number_of_reads))
         all_ones_sample = np.ones((1,self.number_of_reads))
