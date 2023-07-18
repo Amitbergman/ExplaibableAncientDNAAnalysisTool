@@ -143,7 +143,7 @@ class ExplainableMaximumLikelihoodCalculator:
         #We are aligning the sequence to one of the references, to get the general area in which this sequence is located in the reference
         #Then, the other alignment should just search for the best alignment in this area (to make the computing of the alignments faster)
         #This means that we only need to do full alignment once to every sequence
-        if (read_index%10 ==0):
+        if (read_index%40 ==0):
             print(f"start working on read number {read_index}")
         initial_alignment = pairwise2.align.localms(self.homo_sapien_references[0], self.list_of_reads[read_index], 
             alignment_match_score,
@@ -234,6 +234,9 @@ class ExplainableMaximumLikelihoodCalculator:
             likelihood_of_data = likelihood_of_data * likelihood_of_current_read
         return likelihood_of_data
     
+    def get_A_s_d_values(self):
+        return self.normalized_probabilities_vector
+
     def calc_likelihood_on_partial_references(self, alphas, subset_of_read_indexes, probabilities_of_partial_references):
         
         likelihood_of_data = 1.0
@@ -293,10 +296,16 @@ class ExplainableMaximumLikelihoodCalculator:
     #If result resolution is 100, the result will be in multiplications of 0.01
     #The higher it is, the slower the algorithm, but it is more accurate
     def estimate_species_proportions(self, result_resolution=40,ignore_list_indexes=[]):
-        assert(len(ignore_list_indexes) < len(self.list_of_reads))
         array = np.zeros((1,3))
         features = ["Homo Sapiens", "Neanderthals", "Denisovans"]
         rows = ["Estimation"]
+        assert(len(ignore_list_indexes) <= len(self.list_of_reads))
+        if (len(ignore_list_indexes) == len(self.list_of_reads)):
+            # Don't know anything, just guess uniform over them
+            array[0][0] = 0.33
+            array[0][1] = 0.33
+            array[0][2] = 0.34
+            return pd.DataFrame(array, index=rows, columns=features)
         max_likelihood = 0
         max_alphas = (-1,-1,-1)
         for i in range (result_resolution+1):
@@ -537,7 +546,7 @@ class ExplainableMaximumLikelihoodCalculator:
         print(denisovans)
         return [sapienses, neanderthals, denisovans]
 
-    def analyze_diff_on_removing_reference(self, number_of_runs=20, size_of_sample = 10, result_resolution=50):
+    def analyze_diff_on_removing_reference(self, number_of_samples=20, size_of_sample = 10, result_resolution=50):
         indexes = [i for i in range(self.number_of_reads)]
         if (size_of_sample >= self.number_of_reads):
             size_of_sample = self.number_of_reads // 2
@@ -545,7 +554,7 @@ class ExplainableMaximumLikelihoodCalculator:
         number_of_neanderthals = len(self.second_species_reference_ids)
         number_of_sapienses = len(self.first_species_reference_ids)
         number_of_denisovans = len(self.third_species_reference_ids)
-        for i in range(number_of_runs):
+        for i in range(number_of_samples):
             sample = list(np.random.choice(indexes, size_of_sample, replace=False))
             result_with_all_references = self.calc_maximum_likelihood_on_subset(sample, result_resolution=result_resolution).values[0]
             for neanderthal_to_remove in range(number_of_neanderthals):
@@ -557,6 +566,7 @@ class ExplainableMaximumLikelihoodCalculator:
                 diff =  result_with_all_references - without_reference_i
                 #The diff is the influence of adding reference i to the result
                 data.append((neanderthal_to_remove, diff))
+            # Need to execute the same also for denisovan and Homo Sapiens references
         return data
 
     def draw_only_important_features(self, shap_values, species_index, number_of_features_to_draw=5):
@@ -623,7 +633,7 @@ class ExplainableMaximumLikelihoodCalculator:
         current_reads_to_ignore = []
         i=0
         success = False
-        while(len(current_reads_to_ignore) < self.number_of_reads):
+        while(len(current_reads_to_ignore) < self.number_of_reads-1):
             current_reads_to_ignore.append(s[i][0])
             i+=1
             max_likelihood = self.estimate_species_proportions(ignore_list_indexes=current_reads_to_ignore)
@@ -636,7 +646,35 @@ class ExplainableMaximumLikelihoodCalculator:
             print(f"Change dominating species from {self.list_species_names[current_max]} to {self.list_species_names[max_after]} would require removing {len(current_reads_to_ignore)} reads: {current_reads_to_ignore}")
             return (current_reads_to_ignore, max_after)
         else:
-            return []
+            return ([], "")
+        
+    #Generate counter factual 1, using the a_s_d values    
+    def generateCounterFactualMinimalSetToRemoveAndChangeMax_using_a_s_d_values(self):
+        #current_maximizer = self.max_3_references()
+        #calculate reads that are most influential against it
+        #remove them one by one and while the maximum remains the same
+        current_max = self.estimate_species_proportions().values.argmax()
+        a_s_d_values = self.get_A_s_d_values()
+        influence_on_highest = [t[current_max] for t in a_s_d_values]
+        org = [(i, influence_on_highest[i]) for i in range(self.number_of_reads)]
+        s = sorted(org, key=lambda a:a[1], reverse=True)
+        current_reads_to_ignore = []
+        i=0
+        success = False
+        while(len(current_reads_to_ignore) < self.number_of_reads-1):
+            current_reads_to_ignore.append(s[i][0])
+            i+=1
+            max_likelihood = self.estimate_species_proportions(ignore_list_indexes=current_reads_to_ignore)
+            max_after = max_likelihood.values.argmax()
+            if (max_after != current_max):
+                success = True
+                break
+        
+        if (success):
+            print(f"Change dominating species from {self.list_species_names[current_max]} to {self.list_species_names[max_after]} would require removing {len(current_reads_to_ignore)} reads: {current_reads_to_ignore}")
+            return (current_reads_to_ignore, max_after)
+        else:
+            return ([], "")
 
     
     #Optimize the likelihood function usinge a variant of the gradient descent algorithm
