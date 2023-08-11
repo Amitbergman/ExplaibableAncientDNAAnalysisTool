@@ -363,7 +363,7 @@ class ExplainableMaximumLikelihoodCalculator:
         results_with_minus_without = []
         results_with_minus_without_not_scaled = []
         for i in range(number_of_samples_per_read):
-            sample_size =  random.randint(3,len(possible_indexes))
+            sample_size =  random.randint(1,len(possible_indexes))
             sample_without = random.sample(possible_indexes, sample_size)
             sample_with = sample_without.copy()
             sample_with.append(read_index)
