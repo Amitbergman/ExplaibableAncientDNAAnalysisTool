@@ -378,32 +378,40 @@ class ExplainableMaximumLikelihoodCalculator:
         average_influence_not_scaled = np.mean(np.asarray(results_with_minus_without_not_scaled), axis=0)
         return (read_index, average_influence_scaled, average_influence_not_scaled)
 
-    def estimate_shapley_values(self, number_of_samples_per_read=200, number_of_jobs=-1, sample_to_run = []):
+
+    def estimate_shapley_values(self, number_of_samples_per_read=200, number_of_jobs=-1):
         #This will return for every species the influence of every read on the value of the model
         #For example, results[0][i] will be the influence of read i on "Sapiens" value of the result 
         #For example, results[1][i] will be the influence of read i on "Neanderthals" value of the result 
         #For example, results[2][i] will be the influence of read i on "Denisovans" value of the result 
         #Positive number in sapiens influece means that this read made the model lean more to the direction of saying "Sapiens" 
         
-        if (len(sample_to_run)==0):
-            sample_to_run = [i for i in range(self.number_of_reads)]
-        number_of_reads = len(sample_to_run)
-        results_scaled = np.zeros((self.number_of_reads, 3))
-        results_not_scaled = np.zeros((self.number_of_reads, 3))
-            
-        results_from_threads = Parallel(n_jobs=number_of_jobs, backend='multiprocessing')(delayed(self.estimate_shapley_value_for_read)(i, number_of_samples_per_read) for i in sample_to_run)
-        for (read_index, average_influence_scaled, average_influence_not_scaled) in results_from_threads:
-            results_scaled[read_index] = average_influence_scaled
-            results_not_scaled[read_index] = average_influence_not_scaled
-        sapienses_shapley_estimation = results_scaled[None,:,0]
-        neanderthals_shapley_estimation = results_scaled[None,:,1]
-        denisovans_shapley_estimation = results_scaled[None,:,2]
-        sapienses_shapley_estimation_not_scaled = results_not_scaled[None,:,0]
-        neanderthals_shapley_estimation_not_scaled = results_not_scaled[None,:,1]
-        denisovans_shapley_estimation_not_scaled = results_not_scaled[None,:,2]
-        scaled = [sapienses_shapley_estimation,neanderthals_shapley_estimation, denisovans_shapley_estimation]
-        not_scaled = [sapienses_shapley_estimation_not_scaled,neanderthals_shapley_estimation_not_scaled, denisovans_shapley_estimation_not_scaled]
-        return (scaled, not_scaled)
+        
+        sample_to_run = [i for i in range(self.number_of_reads)]
+        averageInfluece = np.zeros((self.number_of_reads, 3))
+
+        change_dict = dict()
+        for i in sample_to_run:
+            change_dict[i] = []
+        for i in range(number_of_samples_per_read):
+            permutation = GenomeParseUtils.get_random_perm(sample_to_run)
+            for length in range(len(permutation)):
+                current_data_with = permutation[:length+1]
+                current_data_without = permutation[:length]
+                item_we_are_adding = permutation[length]
+                model_result_with_index = np.asarray(self.calc_maximum_likelihood_on_subset(current_data_with, result_resolution=50).values.flatten())
+                model_result_without_index = np.asarray(self.calc_maximum_likelihood_on_subset(current_data_without, result_resolution=50).values.flatten())
+                current_diff = model_result_with_index - model_result_without_index
+                change_dict[item_we_are_adding].append(current_diff)
+
+        for i in sample_to_run:
+            averageInfluece[i] = GenomeParseUtils.get_average_of_list(change_dict[i])
+
+        sapienses_shapley_estimation_not_scaled = averageInfluece[None,:,0]
+        neanderthals_shapley_estimation_not_scaled = averageInfluece[None,:,1]
+        denisovans_shapley_estimation_not_scaled = averageInfluece[None,:,2]
+        results = [sapienses_shapley_estimation_not_scaled,neanderthals_shapley_estimation_not_scaled, denisovans_shapley_estimation_not_scaled]
+        return results
         
     def plot_influence_values(self, influence_values):
         sapienses = influence_values[0].flatten()
@@ -646,7 +654,7 @@ class ExplainableMaximumLikelihoodCalculator:
             print(f"Change dominating species from {self.list_species_names[current_max]} to {self.list_species_names[max_after]} would require removing {len(current_reads_to_ignore)} reads: {current_reads_to_ignore}")
             return (current_reads_to_ignore, max_after)
         else:
-            return ([], "")
+            return ([i for i in range(self.number_of_reads)], "")
         
     #Generate counter factual 1, using the a_s_d values    
     def generateCounterFactualMinimalSetToRemoveAndChangeMax_using_a_s_d_values(self):
@@ -678,7 +686,7 @@ class ExplainableMaximumLikelihoodCalculator:
 
     
     #Optimize the likelihood function usinge a variant of the gradient descent algorithm
-    def estimate_species_proportions_gradient_descent(self, number_of_starting_points = 1, number_of_iterations=100, ignore_list_indexes=[]):
+    def estimate_species_proportions_gradient_descent(self, number_of_starting_points = 1, number_of_iterations=100, change_rate = 0.01, ignore_list_indexes=[]):
         assert(len(ignore_list_indexes) < len(self.list_of_reads))
         array = np.zeros((1,3))
         features = ["Homo Sapiens", "Neanderthals", "Denisovans"]
@@ -692,7 +700,7 @@ class ExplainableMaximumLikelihoodCalculator:
             c = 10-a-b
             starting_point = np.asarray([a/10,b/10,c/10])
             current = starting_point
-            change_rate = 0.01
+            
             for i in range(number_of_iterations):
                 option_a = self.__makeSumOneAndVerifyNoNegative__(current + [change_rate, -change_rate, 0])
                 option_b = self.__makeSumOneAndVerifyNoNegative__(current + [-change_rate, change_rate, 0])

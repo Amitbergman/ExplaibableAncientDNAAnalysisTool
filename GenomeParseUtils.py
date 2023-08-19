@@ -1,5 +1,7 @@
 from Bio import SeqIO
 import csv
+import random
+import numpy as np
 
 def getListOfGenomes(fileNames):
     genomes = []
@@ -17,6 +19,14 @@ def getGenome(fileName):
 
 def makeGenomeCircular(genome, max_read_length=100):
     return genome + genome[:max_read_length]
+
+def get_average_of_list(list_of_influences):
+    average_influence = np.mean(np.asarray(list_of_influences), axis=0)
+    return average_influence
+
+def get_random_perm(group_elements):
+    random_permutation = random.sample(group_elements, len(group_elements))
+    return random_permutation
 
 
 def getListOfGenomeIds(fileNames, specieNameToAdd):
