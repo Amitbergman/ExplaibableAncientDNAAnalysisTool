@@ -495,6 +495,17 @@ class ExplainableMaximumLikelihoodCalculator:
         shap_values = explainer.shap_values(all_ones_sample, nsamples=nsamples)
         return shap_values
     
+
+    def getRankingOfA_d_s_Values(self):
+        a_d_s = self.get_A_s_d_values()
+        order = []
+        for label in range(len(self.list_species_names)):
+            relevant_to_label = list(enumerate([i[label] for i in a_d_s]))
+            sorted_list = sorted(relevant_to_label, key=lambda a: a[1])
+            only_ind = [i[0] for i in sorted_list]
+            order.append((self.list_species_names[label], only_ind))
+        return order
+
     def plot_shap_values(self, shap_values):
 
         print("summary plot:")
