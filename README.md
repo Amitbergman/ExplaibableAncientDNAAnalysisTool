@@ -1,4 +1,4 @@
-﻿# exML - explainable DNA analysis tool
+﻿# exML - explainable Proportion estimation for DNA analysis
 
 This project includes a python system to classify a dataset of DNA reads (either ``.bam`` or ``.fasta`` files) and output the estimated proportion of different species in the dataset.
 It also provides explanations to the output that make it more interpretale and resolve ambiguities in the output.
